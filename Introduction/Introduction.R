@@ -1,0 +1,146 @@
+## ----include = FALSE----------------------------------------------------------
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+## ----setup--------------------------------------------------------------------
+
+if (!requireNamespace("caret")) install.packages('caret')
+if (!requireNamespace("dplyr")) install.packages('dplyr')
+if (!requireNamespace("tidyverse")) install.packages('tidyverse')
+if (!requireNamespace("Metrics")) install.packages('Metrics')
+if (!requireNamespace("MASS")) install.packages('MASS')
+
+library(tidyverse)
+library(dplyr)
+library(caret)
+library(MASS)
+library(Metrics)
+
+library(simpleEnsembleGroup19)
+
+
+# Load binary response data
+data("Pima.te", package = "MASS")
+# Load continuous response data
+data("Boston", package = "MASS")
+
+
+## -----------------------------------------------------------------------------
+boston_df <- Boston
+boston_df <- na.omit(boston_df)
+set.seed(123)
+split_indicies <- createDataPartition(boston_df$medv, p=0.75, list=FALSE)
+train.data <- boston_df[split_indicies, ]
+test.data <- boston_df[-split_indicies, ]
+
+x_train <- model.matrix(medv~., train.data)[,-1]
+y_train <- train.data$medv
+x_test <- model.matrix(medv~., test.data)[,-1]
+y_test <- test.data$medv
+
+## -----------------------------------------------------------------------------
+set.seed(123)
+#single model object
+set.seed(123)
+model_linear_fit <- fitModel(x_train, y_train,"linear")
+model_linear_pred <- predict(model_linear_fit$model, as.data.frame(x_test))
+rmse_linear <- rmse(model_linear_pred, y_test)
+
+#using bagging option
+set.seed(123)
+model_bagging_fit <- fitModel(x_train, y_train, "linear", bagging=TRUE, R = 30)
+model_bagging_pred <-use_bagging_predict(model_bagging_fit, as.data.frame(x_test))
+rmse_linear_bagging <- rmse(model_bagging_pred, y_test)
+
+#using ensemble option
+set.seed(123)
+model_ensemble_fit <- fitModel(x_train, y_train, ensemble=TRUE,model_types = c("linear", "randomForest", "ridge", "lasso", "elastic_net"))
+model_ensemble_pred <- use_ensemble_predict(model_ensemble_fit, x_test)
+rmse_ensemble <- rmse(model_ensemble_pred, y_test)
+
+cat("RMSE for linear model: ", rmse_linear, "\nRMSE for Bagging Option: ", rmse_linear_bagging, "\nRMSE for Ensemble Option: ", rmse_ensemble)
+
+
+
+## -----------------------------------------------------------------------------
+pima.te_df <- Pima.te
+pima.te_df <- na.omit(pima.te_df)
+set.seed(123)
+split_indicies <- createDataPartition(pima.te_df$type, p=0.75, list=FALSE)
+train.data <- pima.te_df[split_indicies, ]
+test.data <- pima.te_df[-split_indicies, ]
+x_train <- model.matrix(type~., train.data)[,-1]
+y_train <- train.data$type
+x_test <- model.matrix(type~., test.data)[,-1]
+y_test <- test.data$type
+
+## -----------------------------------------------------------------------------
+set.seed(123)
+model_logistic_fit <- fitModel(x_train, y_train,"logistic")
+model_logistic_pred <- predict(model_logistic_fit$model, as.data.frame(x_test))
+model_logistic_pred.class <- ifelse(model_logistic_pred>0.5, 1, 0)
+conf_matrix_logistic <- confusionMatrix(as.factor(model_logistic_pred.class), as.factor(as.numeric(y_test)-1))
+overall_accuracy_logistic <- conf_matrix_logistic$overall['Accuracy']
+
+set.seed(123)
+model_bagging_fit <- fitModel(x_train, y_train, "logistic", bagging= TRUE, R=200)
+model_bagging_pred.class <- use_bagging_predict(model_bagging_fit, x_test)
+conf_matrix_bagging <- confusionMatrix(as.factor(model_bagging_pred.class), as.factor(as.numeric(y_test)-1))
+overall_accuracy_bagging <- conf_matrix_bagging$overall['Accuracy']
+
+set.seed(123)
+model_ensemble_fit<- fitModel(x_train, y_train, ensemble= TRUE, model_types = c("logistic", "randomForest", "ridge", "lasso", "elastic_net"))
+model_ensemble_pred.class <- use_ensemble_predict(model_ensemble_fit, x_test)
+conf_matrix_ensemble <- confusionMatrix(as.factor(model_ensemble_pred.class), as.factor(as.numeric(y_test)-1))
+overall_accuracy_ensemble <- conf_matrix_ensemble$overall['Accuracy']
+
+
+cat("\nlogistic accuracy: " , overall_accuracy_logistic)
+cat("\nbagging accuracy: ", overall_accuracy_bagging)
+cat("\nensemble accuracy: ", overall_accuracy_ensemble)
+
+
+
+## -----------------------------------------------------------------------------
+data("GreatUnknown")
+great_unknown_df <- GreatUnknown
+cleaned_great_unknown_df <- na.omit(great_unknown_df)
+set.seed(123)
+split_indicies <- createDataPartition(cleaned_great_unknown_df$y, p=0.75, list=FALSE)
+train.data <- cleaned_great_unknown_df[split_indicies, ]
+test.data <- cleaned_great_unknown_df[-split_indicies, ]
+
+x_train <- model.matrix(y~., train.data)[,-1]
+y_train <- train.data$y
+x_test <- model.matrix(y~., test.data)[,-1]
+y_test <- test.data$y
+
+
+## -----------------------------------------------------------------------------
+set.seed(123)
+model_lasso_fit <- fitModel(x_train, y_train,"lasso")
+model_lasso_pred <- predict(model_lasso_fit$model, x_test)
+model_lasso_pred.class <- ifelse(model_lasso_pred>0.5, 1, 0)
+conf_matrix_lasso <- confusionMatrix(as.factor(model_lasso_pred.class), as.factor(y_test))
+overall_accuracy_lasso <- conf_matrix_lasso$overall['Accuracy']
+
+set.seed(123)
+model_bagging_fit <- fitModel(x_train, y_train, "lasso", bagging= TRUE, R=60)
+model_bagging_pred.class <- use_bagging_predict(model_bagging_fit, x_test)
+conf_matrix_bagging <- confusionMatrix(as.factor(model_bagging_pred.class), as.factor(y_test))
+overall_accuracy_bagging <- conf_matrix_bagging$overall['Accuracy']
+
+set.seed(123)
+model_ensemble_fit<- fitModel(x_train, y_train, ensemble= TRUE, model_types = c("logistic", "randomForest", "ridge", "lasso", "elastic_net"))
+model_ensemble_pred.class <- use_ensemble_predict(model_ensemble_fit, x_test)
+conf_matrix_ensemble <- confusionMatrix(as.factor(model_ensemble_pred.class), as.factor(y_test))
+overall_accuracy_ensemble <- conf_matrix_ensemble$overall['Accuracy']
+
+
+cat("\nLasso model accuracy: " , overall_accuracy_lasso)
+cat("\nbagging accuracy: ", overall_accuracy_bagging)
+cat("\nensemble accuracy: ", overall_accuracy_ensemble)
+
+
